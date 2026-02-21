@@ -1,0 +1,17 @@
+export const CONSTRUCTION_PHASES = [
+  'Excavation',
+  'Foundations',
+  'Concrete',
+  'Waterproofing',
+  'Structural Steel',
+  'Framing',
+  'Roofing',
+  'Exterior Cladding',
+  'Windows & Doors',
+  'MEP (Mechanical/Electrical/Plumbing)',
+  'Interior Finishes',
+  'Landscaping',
+  'Site Work',
+  'Safety',
+  'General / Other',
+]
