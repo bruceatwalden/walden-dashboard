@@ -716,6 +716,28 @@ export async function getRecentUncategorizedPhotos(limit = 10) {
   return { photos: data || [], totalPending: count || 0 }
 }
 
+// Phase counts: count photos per construction phase label (for admin categories page)
+export async function getPhaseCounts() {
+  const { data, error } = await supabase
+    .from('site_photos')
+    .select('construction_phases')
+    .not('construction_phases', 'is', null)
+  if (error) throw error
+
+  const counts = {}
+  for (const row of data || []) {
+    for (const label of row.construction_phases || []) {
+      counts[label] = (counts[label] || 0) + 1
+      // Also count toward the main category
+      const main = label.split(' > ')[0]
+      if (main !== label) {
+        counts[main] = (counts[main] || 0) + 1
+      }
+    }
+  }
+  return counts
+}
+
 // Manual categorizer: filtered uncategorized photos
 export async function getUncategorizedPhotosFiltered({ projectId, startDate, endDate } = {}) {
   let query = supabase
@@ -1508,5 +1530,23 @@ export async function unresolveAlert(transcriptItemId) {
     .delete()
     .eq('transcript_item_id', transcriptItemId)
 
+  if (error) throw error
+}
+
+// --- Admin: CM Users ---
+
+export async function getCMUsers(callerId) {
+  const { data, error } = await supabase.rpc('list_cm_users', {
+    caller_id: callerId,
+  })
+  if (error) throw error
+  return data
+}
+
+export async function updateCMUser(id, updates) {
+  const { error } = await supabase
+    .from('cm_users')
+    .update(updates)
+    .eq('id', id)
   if (error) throw error
 }

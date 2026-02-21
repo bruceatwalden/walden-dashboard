@@ -10,15 +10,28 @@ const BATCH_SIZE = 10
 const BATCH_DELAY = 3000 // 3 seconds between batches
 const STARTUP_DELAY = 10000 // 10 seconds — let the dashboard load first
 
+const ENABLED_KEY = 'autoCategorizer_enabled'
+
 export function AutoCategorizerProvider({ children }) {
   const { user } = useAuth()
   const isAuthenticated = !!user
   const [status, setStatus] = useState('idle') // idle | processing | error
   const [pending, setPending] = useState(0)
+  const [enabled, setEnabledState] = useState(() => {
+    const stored = localStorage.getItem(ENABLED_KEY)
+    return stored === null ? true : stored === 'true'
+  })
   const pausedRef = useRef(false)
+  const enabledRef = useRef(enabled)
 
   const setPaused = useCallback((val) => {
     pausedRef.current = val
+  }, [])
+
+  const setEnabled = useCallback((val) => {
+    enabledRef.current = val
+    setEnabledState(val)
+    localStorage.setItem(ENABLED_KEY, String(val))
   }, [])
 
   useEffect(() => {
@@ -33,8 +46,8 @@ export function AutoCategorizerProvider({ children }) {
     async function run() {
       if (cancelled) return
 
-      // If paused by manual categorizer, check again later
-      if (pausedRef.current) {
+      // If disabled or paused by manual categorizer, check again later
+      if (!enabledRef.current || pausedRef.current) {
         timeoutId = setTimeout(run, POLL_INTERVAL)
         return
       }
@@ -94,8 +107,8 @@ export function AutoCategorizerProvider({ children }) {
   }, [isAuthenticated])
 
   const value = useMemo(
-    () => ({ status, pending, setPaused }),
-    [status, pending, setPaused]
+    () => ({ status, pending, setPaused, enabled, setEnabled }),
+    [status, pending, setPaused, enabled, setEnabled]
   )
 
   return (

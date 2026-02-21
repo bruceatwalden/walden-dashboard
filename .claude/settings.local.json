@@ -8,7 +8,8 @@
       "Bash(npm run dev:*)",
       "Bash(npm run build:*)",
       "Bash(head:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(cd:*)"
     ]
   }
 }

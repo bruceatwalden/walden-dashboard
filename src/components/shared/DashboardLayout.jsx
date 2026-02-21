@@ -1,12 +1,14 @@
 import { useAuth } from '../../hooks/useAuth'
 import { useAutoCategorizer } from '../../hooks/useAutoCategorizer'
 import { useNavigate, useLocation, Link } from 'react-router-dom'
+import { getUserAllowedDashboards, ALL_DASHBOARDS } from '../../lib/auth'
 
 const NAV_ITEMS = [
-  { path: '/danny', label: 'Production' },
-  { path: '/bruce', label: 'Executive' },
-  { path: '/doron', label: 'Financial' },
-  { path: '/coordinator', label: 'Coordinator' },
+  { key: 'production', path: '/danny', label: 'Production' },
+  { key: 'executive', path: '/bruce', label: 'Executive' },
+  { key: 'financial', path: '/doron', label: 'Financial' },
+  { key: 'coordinator', path: '/coordinator', label: 'Coordinator' },
+  { key: 'admin', path: '/admin', label: 'Admin' },
 ]
 
 export default function DashboardLayout({ title, children }) {
@@ -14,6 +16,9 @@ export default function DashboardLayout({ title, children }) {
   const autoCat = useAutoCategorizer()
   const navigate = useNavigate()
   const location = useLocation()
+
+  const allowed = getUserAllowedDashboards(user)
+  const visibleNav = NAV_ITEMS.filter((item) => allowed.includes(item.key))
 
   function handleLogout() {
     logout()
@@ -58,7 +63,7 @@ export default function DashboardLayout({ title, children }) {
             </div>
           </div>
           <nav className="flex gap-1 -mb-px">
-            {NAV_ITEMS.map((item) => {
+            {visibleNav.map((item) => {
               const active = location.pathname === item.path
               return (
                 <Link

@@ -1,9 +1,10 @@
-import { CONSTRUCTION_PHASES } from './construction-phases'
+import { getEnabledPhases, getAllPhaseLabels } from './construction-phases'
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages'
 
 /**
  * Send a photo thumbnail to Claude Haiku for construction phase categorization.
+ * Returns both main categories and subcategories in "Category > Subcategory" format.
  * @param {string} thumbnailUrl - Public URL of the photo thumbnail
  * @returns {Promise<{ phases: string[] }>}
  */
@@ -11,7 +12,16 @@ export async function categorizePhoto(thumbnailUrl) {
   const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY
   if (!apiKey) throw new Error('VITE_ANTHROPIC_API_KEY is not set')
 
-  const phaseList = CONSTRUCTION_PHASES.map((p) => `- ${p}`).join('\n')
+  const phases = getEnabledPhases()
+  const phaseList = phases
+    .map((p) => {
+      const subs =
+        p.subcategories.length > 0
+          ? `\n    Subcategories: ${p.subcategories.join(', ')}`
+          : ''
+      return `- ${p.name}: ${p.description}${subs}`
+    })
+    .join('\n')
 
   const response = await fetch(ANTHROPIC_API_URL, {
     method: 'POST',
@@ -23,7 +33,7 @@ export async function categorizePhoto(thumbnailUrl) {
     },
     body: JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 100,
+      max_tokens: 150,
       messages: [
         {
           role: 'user',
@@ -34,9 +44,13 @@ export async function categorizePhoto(thumbnailUrl) {
             },
             {
               type: 'text',
-              text: `Analyze this construction site photo for Walden, a construction management company. Respond in EXACTLY this format with no other text:
+              text: `Analyze this construction site photo for Walden, a residential/commercial builder. Respond in EXACTLY this format with no other text:
 
-PHASES: <1 to 3 comma-separated categories from the list below, most relevant first>
+PHASES: <1 to 3 comma-separated phases from the list below>
+
+Use "Category > Subcategory" when a specific subcategory clearly applies.
+Use just "Category" when the photo is general to the category or no subcategory fits.
+If nothing fits, respond: PHASES: General / Other
 
 Categories:
 ${phaseList}`,
@@ -55,24 +69,37 @@ ${phaseList}`,
   const data = await response.json()
   const raw = (data.content?.[0]?.text || '').trim()
 
-  return parseAnalysisResponse(raw)
+  return parseAnalysisResponse(raw, phases)
 }
 
-function parseAnalysisResponse(raw) {
-  // Parse PHASES — look for the line anywhere in the response
+function parseAnalysisResponse(raw, phases) {
   const phasesMatch = raw.match(/PHASES\s*[:=]\s*(.+)/i)
-  const phasesRaw = phasesMatch ? phasesMatch[1].split(',').map((s) => s.trim()).filter(Boolean) : []
-  const phases = []
-  for (const candidate of phasesRaw) {
-    // Strip leading bullets/numbers/dashes
-    const cleaned = candidate.replace(/^[-*\d.)\s]+/, '').trim()
-    const match = CONSTRUCTION_PHASES.find(
-      (p) => p.toLowerCase() === cleaned.toLowerCase()
-    )
-    if (match && !phases.includes(match)) phases.push(match)
-    if (phases.length >= 3) break
-  }
-  if (phases.length === 0) phases.push('General / Other')
+  const phasesRaw = phasesMatch
+    ? phasesMatch[1].split(',').map((s) => s.trim()).filter(Boolean)
+    : []
 
-  return { phases }
+  const validLabels = new Set(getAllPhaseLabels(phases))
+  const mainNames = new Set(phases.map((p) => p.name))
+
+  const result = []
+  for (const candidate of phasesRaw) {
+    const cleaned = candidate.replace(/^[-*\d.)\s]+/, '').trim()
+
+    // Exact match against valid labels (e.g. "Concrete > Formwork" or "Concrete")
+    if (validLabels.has(cleaned) && !result.includes(cleaned)) {
+      result.push(cleaned)
+    } else {
+      // Try matching just the main category name
+      const mainPart = cleaned.split('>')[0].trim()
+      const match = [...mainNames].find(
+        (n) => n.toLowerCase() === mainPart.toLowerCase()
+      )
+      if (match && !result.includes(match)) result.push(match)
+    }
+    if (result.length >= 3) break
+  }
+
+  if (result.length === 0) result.push('General / Other')
+
+  return { phases: result }
 }

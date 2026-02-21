@@ -3,7 +3,7 @@ import { useDashboardQuery } from '../hooks/useDashboardQuery'
 import { getPhotoGallery, getStorageUrl } from '../lib/queries'
 import { formatDateHeader } from '../lib/dateUtils'
 import Lightbox from '../components/shared/Lightbox'
-import { CONSTRUCTION_PHASES } from '../lib/construction-phases'
+import { getEnabledPhases } from '../lib/construction-phases'
 
 // ---------------------------------------------------------------------------
 // Date range helpers
@@ -112,13 +112,22 @@ export default function PhotoGallery() {
     setLightbox({ photos, index, projectName })
   }
 
+  const enabledPhases = useMemo(() => getEnabledPhases(), [])
+
   const filteredData = useMemo(() => {
     if (!data) return null
     if (!clientOnly && !phaseFilter) return data
 
     const photoFilter = (p) => {
       if (clientOnly && !p.clientVisible) return false
-      if (phaseFilter && !(p.constructionPhases || []).includes(phaseFilter)) return false
+      if (phaseFilter) {
+        const labels = p.constructionPhases || []
+        // Match exact label OR any label starting with "Phase > " for main category filters
+        const matches = labels.some(
+          (label) => label === phaseFilter || label.startsWith(phaseFilter + ' > ')
+        )
+        if (!matches) return false
+      }
       return true
     }
 
@@ -186,8 +195,13 @@ export default function PhotoGallery() {
                 className="border border-gray-200 rounded-md px-2 py-1.5 text-sm bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-gray-400"
               >
                 <option value="">All Phases</option>
-                {CONSTRUCTION_PHASES.map((p) => (
-                  <option key={p} value={p}>{p}</option>
+                {enabledPhases.map((p) => (
+                  <optgroup key={p.name} label={p.name}>
+                    <option value={p.name}>{p.name} (all)</option>
+                    {p.subcategories.map((sub) => (
+                      <option key={sub} value={`${p.name} > ${sub}`}>{sub}</option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
               <GalleryDateFilter filter={filter} onChange={setFilter} />

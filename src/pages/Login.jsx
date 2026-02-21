@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
-import { login, getRolePath } from '../lib/auth'
+import { login, getDefaultPath } from '../lib/auth'
 
 export default function Login() {
   const [pin, setPin] = useState(['', '', '', ''])
@@ -78,7 +78,7 @@ export default function Login() {
         return
       }
       loginUser(result)
-      navigate(getRolePath(result.role), { replace: true })
+      navigate(getDefaultPath(result), { replace: true })
     } catch (err) {
       setError(err.message || 'Login failed')
       setPin(['', '', '', ''])
