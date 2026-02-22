@@ -47,6 +47,7 @@ export default function VendorCompliancePanel({ days = 90, onDataLoaded }) {
         color="red"
         columns={atRiskColumns}
         onOverride={setOverrideTarget}
+        defaultOpen
       />
       <VendorSection
         title="Expiring Soon"
@@ -55,6 +56,15 @@ export default function VendorCompliancePanel({ days = 90, onDataLoaded }) {
         loading={loading && !data}
         color="amber"
         columns={expiringColumns}
+        defaultOpen
+      />
+      <VendorSection
+        title="Cleared"
+        description="Current WSIB clearance confirmed"
+        items={data?.cleared}
+        loading={loading && !data}
+        color="green"
+        columns={clearedColumns}
       />
       <VendorSection
         title="COI Expired"
@@ -63,6 +73,7 @@ export default function VendorCompliancePanel({ days = 90, onDataLoaded }) {
         loading={loading && !data}
         color="orange"
         columns={coiColumns}
+        defaultOpen
       />
       <VendorSection
         title="Excluded"
@@ -88,7 +99,6 @@ export default function VendorCompliancePanel({ days = 90, onDataLoaded }) {
 
 function parsePeriodDate(str) {
   if (!str) return null
-  // "19Feb2026" → Date
   const match = str.match(/^(\d{1,2})([A-Za-z]+)(\d{4})$/)
   if (!match) return null
   const months = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 }
@@ -153,6 +163,14 @@ const expiringColumns = [
   { key: 'latestInvoiceDate', label: 'Last Invoice', render: (v) => formatDate(v.latestInvoiceDate) },
 ]
 
+const clearedColumns = [
+  { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900' },
+  { key: 'currentStatus', label: 'WSIB Status', render: (v) => <StatusBadge value={v.currentStatus} /> },
+  { key: 'projects', label: 'Projects', render: (v) => v.projects?.join(', ') || '—' },
+  { key: 'invoiceCount', label: 'Invoices', className: 'text-right tabular-nums' },
+  { key: 'latestInvoiceDate', label: 'Last Invoice', render: (v) => formatDate(v.latestInvoiceDate) },
+]
+
 const coiColumns = [
   { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900' },
   { key: 'coiExpiryDate', label: 'COI Expired', render: (v) => formatDate(v.coiExpiryDate) },
@@ -189,6 +207,12 @@ const COLOR_MAP = {
     headerBg: 'bg-amber-50/50',
     dot: 'bg-amber-500',
   },
+  green: {
+    badge: 'bg-green-50 text-green-700',
+    headerBorder: 'border-green-200',
+    headerBg: 'bg-green-50/50',
+    dot: 'bg-green-500',
+  },
   orange: {
     badge: 'bg-orange-50 text-orange-700',
     headerBorder: 'border-orange-200',
@@ -203,60 +227,75 @@ const COLOR_MAP = {
   },
 }
 
-// --- VendorSection ---
+// --- VendorSection (collapsible) ---
 
-function VendorSection({ title, description, items, loading, color, columns, onOverride }) {
+function VendorSection({ title, description, items, loading, color, columns, onOverride, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen)
   const c = COLOR_MAP[color]
   const count = items?.length ?? 0
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-      <div className={`px-6 py-4 border-b ${c.headerBorder} ${c.headerBg} flex items-center justify-between`}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`w-full px-6 py-4 border-b ${c.headerBorder} ${c.headerBg} flex items-center justify-between cursor-pointer select-none`}
+      >
         <div className="flex items-center gap-2">
+          <svg
+            className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-90' : ''}`}
+            fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+          </svg>
           <span className={`w-2 h-2 rounded-full ${c.dot}`} />
           <h3 className="text-sm font-medium text-gray-900">{title}</h3>
-          <span className="text-xs text-gray-500">{description}</span>
+          <span className="text-xs text-gray-500 hidden sm:inline">{description}</span>
         </div>
         {!loading && (
           <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${c.badge}`}>
             {count}
           </span>
         )}
-      </div>
+      </button>
 
-      {loading ? (
-        <div className="p-6">
-          <div className="h-24 bg-gray-100 rounded animate-pulse" />
-        </div>
-      ) : count === 0 ? (
-        <div className="p-6">
-          <p className="text-sm text-gray-400 text-center py-2">None</p>
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                {columns.map((col) => (
-                  <th key={col.key} className={`px-6 py-3 ${col.className?.includes('text-right') ? 'text-right' : ''}`}>
-                    {col.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {items.map((item, i) => (
-                <tr key={i} className="hover:bg-gray-50">
-                  {columns.map((col) => (
-                    <td key={col.key} className={`px-6 py-3 ${col.className || 'text-gray-600'}`}>
-                      {col.render ? col.render(item, { onOverride }) : (item[col.key] ?? '—')}
-                    </td>
+      {open && (
+        <>
+          {loading ? (
+            <div className="p-6">
+              <div className="h-24 bg-gray-100 rounded animate-pulse" />
+            </div>
+          ) : count === 0 ? (
+            <div className="p-6">
+              <p className="text-sm text-gray-400 text-center py-2">None</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {columns.map((col) => (
+                      <th key={col.key} className={`px-6 py-3 ${col.className?.includes('text-right') ? 'text-right' : ''}`}>
+                        {col.label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {items.map((item, i) => (
+                    <tr key={i} className="hover:bg-gray-50">
+                      {columns.map((col) => (
+                        <td key={col.key} className={`px-6 py-3 ${col.className || 'text-gray-600'}`}>
+                          {col.render ? col.render(item, { onOverride }) : (item[col.key] ?? '—')}
+                        </td>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
