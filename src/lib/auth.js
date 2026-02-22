@@ -76,6 +76,15 @@ export function saveDashboardPermissions(permissions) {
   localStorage.setItem(PERMISSIONS_KEY, JSON.stringify(permissions))
 }
 
+// Name-based dashboard defaults (used before generic role fallback)
+const NAME_DEFAULTS = {
+  Bruce: ['production', 'executive', 'financial', 'coordinator', 'admin'],
+  Danny: ['production', 'financial', 'coordinator'],
+  Doron: ['financial'],
+  Vuk: ['coordinator'],
+  Nate: ['coordinator'],
+}
+
 // Get allowed dashboard keys for a specific user
 export function getUserAllowedDashboards(user) {
   if (!user) return []
@@ -85,6 +94,12 @@ export function getUserAllowedDashboards(user) {
   // If permissions are configured for this user, use them
   if (perms && perms[user.id]) {
     return perms[user.id]
+  }
+
+  // Check name-based defaults (covers Doron → financial, etc.)
+  const firstName = user.name?.split(' ')[0]
+  if (firstName && NAME_DEFAULTS[firstName]) {
+    return NAME_DEFAULTS[firstName]
   }
 
   // Fall back to role-based defaults

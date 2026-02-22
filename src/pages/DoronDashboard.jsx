@@ -18,12 +18,14 @@ export default function DoronDashboard() {
         { label: 'Expiring Soon', value: summary.expiringSoon, loading: false, color: 'amber' },
         { label: 'Cleared', value: summary.cleared, loading: false, color: 'green' },
         { label: 'COI Expired', value: summary.coiExpired, loading: false, color: 'orange' },
+        { label: 'Excluded', value: summary.excluded ?? 0, loading: false, color: 'gray' },
       ]
     : [
         { label: 'At Risk', value: null, loading: true },
         { label: 'Expiring Soon', value: null, loading: true },
         { label: 'Cleared', value: null, loading: true },
         { label: 'COI Expired', value: null, loading: true },
+        { label: 'Excluded', value: null, loading: true },
       ]
 
   return (
@@ -31,9 +33,10 @@ export default function DoronDashboard() {
       <div className="space-y-6">
         <div className="flex flex-wrap items-center gap-4">
           <DateRangePicker {...dateRange} onChange={setDateRange} />
-          <span className="text-xs text-gray-400">
-            Showing vendors active in the last {days} day{days !== 1 ? 's' : ''}
-          </span>
+          <div className="text-xs text-gray-400">
+            <span className="font-medium text-gray-500">Activity Window:</span>{' '}
+            invoices from the last {days} day{days !== 1 ? 's' : ''} — does not affect WSIB clearance dates
+          </div>
         </div>
 
         <ComplianceStatsBar stats={stats} />
@@ -57,6 +60,7 @@ function ComplianceStatsBar({ stats }) {
     amber: 'border-amber-200 bg-amber-50/40',
     green: 'border-green-200 bg-green-50/40',
     orange: 'border-orange-200 bg-orange-50/40',
+    gray: 'border-gray-200 bg-gray-50/40',
   }
 
   const valueStyles = {
@@ -64,10 +68,11 @@ function ComplianceStatsBar({ stats }) {
     amber: 'text-amber-700',
     green: 'text-green-700',
     orange: 'text-orange-700',
+    gray: 'text-gray-500',
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
       {stats.map((stat) => {
         const cardClass = stat.color && !stat.loading
           ? colorStyles[stat.color] || 'border-gray-200'

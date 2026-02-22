@@ -19,3 +19,16 @@ export async function fetchBackendAPI(path, params = {}) {
 export function getVendorCompliance(days) {
   return fetchBackendAPI('vendor-compliance', { days })
 }
+
+export async function postVendorOverride(body) {
+  const res = await fetch(`${BACKEND_URL}/wsib-override`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || `Backend API error (${res.status})`)
+  }
+  return res.json()
+}
