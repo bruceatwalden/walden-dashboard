@@ -14,18 +14,20 @@ export default function DoronDashboard() {
 
   const stats = summary
     ? [
-        { label: 'At Risk', value: summary.notCleared, loading: false, color: 'red' },
+        { label: 'Not Cleared', value: summary.notCleared, subtitle: `${summary.notClearedActive} active`, loading: false, color: 'red' },
         { label: 'Expiring Soon', value: summary.expiringSoon, loading: false, color: 'amber' },
         { label: 'Cleared', value: summary.cleared, loading: false, color: 'green' },
         { label: 'COI Expired', value: summary.coiExpired, loading: false, color: 'orange' },
         { label: 'Excluded', value: summary.excluded ?? 0, loading: false, color: 'gray' },
+        { label: 'Untracked', value: summary.untracked ?? 0, loading: false, color: 'blue' },
       ]
     : [
-        { label: 'At Risk', value: null, loading: true },
+        { label: 'Not Cleared', value: null, loading: true },
         { label: 'Expiring Soon', value: null, loading: true },
         { label: 'Cleared', value: null, loading: true },
         { label: 'COI Expired', value: null, loading: true },
         { label: 'Excluded', value: null, loading: true },
+        { label: 'Untracked', value: null, loading: true },
       ]
 
   return (
@@ -61,6 +63,7 @@ function ComplianceStatsBar({ stats }) {
     green: 'border-green-200 bg-green-50/40',
     orange: 'border-orange-200 bg-orange-50/40',
     gray: 'border-gray-200 bg-gray-50/40',
+    blue: 'border-blue-200 bg-blue-50/40',
   }
 
   const valueStyles = {
@@ -69,10 +72,11 @@ function ComplianceStatsBar({ stats }) {
     green: 'text-green-700',
     orange: 'text-orange-700',
     gray: 'text-gray-500',
+    blue: 'text-blue-700',
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
       {stats.map((stat) => {
         const cardClass = stat.color && !stat.loading
           ? colorStyles[stat.color] || 'border-gray-200'
@@ -91,6 +95,9 @@ function ComplianceStatsBar({ stats }) {
                 stat.value ?? '--'
               )}
             </p>
+            {stat.subtitle && !stat.loading && (
+              <p className="text-xs text-gray-400 mt-0.5">{stat.subtitle}</p>
+            )}
           </div>
         )
       })}

@@ -17,7 +17,6 @@ export default function VendorCompliancePanel({ days = 90, onDataLoaded }) {
     const data = await getVendorCompliance(days)
     onDataLoaded?.({
       ...data.summary,
-      expiringSoon: data.expiringSoon?.length ?? 0,
       currentPeriod: data.currentPeriod,
       nextPeriod: data.nextPeriod,
     })
@@ -40,12 +39,12 @@ export default function VendorCompliancePanel({ days = 90, onDataLoaded }) {
       {data && <PeriodBar currentPeriod={data.currentPeriod} nextPeriod={data.nextPeriod} />}
 
       <VendorSection
-        title="At Risk"
+        title="Not Cleared"
         description="WSIB clearance is No or missing"
-        items={data?.atRisk}
+        items={data?.notCleared}
         loading={loading && !data}
         color="red"
-        columns={atRiskColumns}
+        columns={notClearedColumns}
         onOverride={setOverrideTarget}
         defaultOpen
       />
@@ -82,6 +81,15 @@ export default function VendorCompliancePanel({ days = 90, onDataLoaded }) {
         loading={loading && !data}
         color="gray"
         columns={excludedColumns}
+      />
+      <VendorSection
+        title="Untracked"
+        description="In invoices but not found in WSIB eClearance sheet"
+        items={data?.untracked}
+        loading={loading && !data}
+        color="blue"
+        columns={untrackedColumns}
+        onOverride={setOverrideTarget}
       />
 
       {overrideTarget && (
@@ -137,11 +145,24 @@ function PeriodBar({ currentPeriod, nextPeriod }) {
   )
 }
 
+// --- Activity indicator ---
+
+function ActivityDot({ active }) {
+  if (!active) return <span className="text-xs text-gray-300">—</span>
+  return (
+    <span className="inline-flex items-center gap-1 text-xs text-green-700">
+      <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+      Active
+    </span>
+  )
+}
+
 // --- Column definitions ---
 
-const atRiskColumns = [
+const notClearedColumns = [
   { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900' },
   { key: 'currentStatus', label: 'WSIB Status', render: (v) => <StatusBadge value={v.currentStatus} /> },
+  { key: '_activity', label: 'Activity', render: (v) => <ActivityDot active={v.hasRecentActivity} /> },
   { key: 'projects', label: 'Projects', render: (v) => v.projects?.join(', ') || '—' },
   { key: 'invoiceCount', label: 'Invoices', className: 'text-right tabular-nums' },
   { key: 'latestInvoiceDate', label: 'Last Invoice', render: (v) => formatDate(v.latestInvoiceDate) },
@@ -158,6 +179,7 @@ const atRiskColumns = [
 const expiringColumns = [
   { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900' },
   { key: 'nextStatus', label: 'Next Period', render: (v) => <StatusBadge value={v.nextStatus} /> },
+  { key: '_activity', label: 'Activity', render: (v) => <ActivityDot active={v.hasRecentActivity} /> },
   { key: 'projects', label: 'Projects', render: (v) => v.projects?.join(', ') || '—' },
   { key: 'invoiceCount', label: 'Invoices', className: 'text-right tabular-nums' },
   { key: 'latestInvoiceDate', label: 'Last Invoice', render: (v) => formatDate(v.latestInvoiceDate) },
@@ -166,6 +188,7 @@ const expiringColumns = [
 const clearedColumns = [
   { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900' },
   { key: 'currentStatus', label: 'WSIB Status', render: (v) => <StatusBadge value={v.currentStatus} /> },
+  { key: '_activity', label: 'Activity', render: (v) => <ActivityDot active={v.hasRecentActivity} /> },
   { key: 'projects', label: 'Projects', render: (v) => v.projects?.join(', ') || '—' },
   { key: 'invoiceCount', label: 'Invoices', className: 'text-right tabular-nums' },
   { key: 'latestInvoiceDate', label: 'Last Invoice', render: (v) => formatDate(v.latestInvoiceDate) },
@@ -175,6 +198,7 @@ const coiColumns = [
   { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900' },
   { key: 'coiExpiryDate', label: 'COI Expired', render: (v) => formatDate(v.coiExpiryDate) },
   { key: 'currentStatus', label: 'WSIB Status', render: (v) => <StatusBadge value={v.currentStatus} /> },
+  { key: '_activity', label: 'Activity', render: (v) => <ActivityDot active={v.hasRecentActivity} /> },
   { key: 'projects', label: 'Projects', render: (v) => v.projects?.join(', ') || '—' },
   { key: 'invoiceCount', label: 'Invoices', className: 'text-right tabular-nums' },
 ]
@@ -187,9 +211,24 @@ const excludedColumns = [
     </span>
   )},
   { key: 'overrideReason', label: 'Reason', className: 'text-gray-500' },
+  { key: '_activity', label: 'Activity', render: (v) => <ActivityDot active={v.hasRecentActivity} /> },
+  { key: 'projects', label: 'Projects', render: (v) => v.projects?.join(', ') || '—' },
+  { key: 'invoiceCount', label: 'Invoices', className: 'text-right tabular-nums' },
+]
+
+const untrackedColumns = [
+  { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900' },
   { key: 'projects', label: 'Projects', render: (v) => v.projects?.join(', ') || '—' },
   { key: 'invoiceCount', label: 'Invoices', className: 'text-right tabular-nums' },
   { key: 'latestInvoiceDate', label: 'Last Invoice', render: (v) => formatDate(v.latestInvoiceDate) },
+  { key: '_override', label: '', render: (v, { onOverride }) => onOverride ? (
+    <button
+      onClick={() => onOverride(v)}
+      className="text-xs text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap"
+    >
+      Override
+    </button>
+  ) : null},
 ]
 
 // --- Color map ---
@@ -224,6 +263,12 @@ const COLOR_MAP = {
     headerBorder: 'border-gray-200',
     headerBg: 'bg-gray-50/50',
     dot: 'bg-gray-400',
+  },
+  blue: {
+    badge: 'bg-blue-50 text-blue-700',
+    headerBorder: 'border-blue-200',
+    headerBg: 'bg-blue-50/50',
+    dot: 'bg-blue-500',
   },
 }
 
