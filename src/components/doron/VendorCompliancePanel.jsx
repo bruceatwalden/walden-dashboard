@@ -157,14 +157,30 @@ function ActivityDot({ active }) {
   )
 }
 
+// --- Vendor name with account number indicator ---
+
+function VendorName({ v }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {v.vendor}
+      {v.hasAccountNumber && (
+        <span title="WSIB account number on file" className="text-emerald-500 flex-shrink-0">
+          <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z" clipRule="evenodd" />
+          </svg>
+        </span>
+      )}
+    </span>
+  )
+}
+
 // --- Column definitions ---
 
 const notClearedColumns = [
-  { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900' },
+  { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900', render: (v) => <VendorName v={v} /> },
   { key: 'currentStatus', label: 'WSIB Status', render: (v) => <StatusBadge value={v.currentStatus} /> },
   { key: '_activity', label: 'Activity', render: (v) => <ActivityDot active={v.hasRecentActivity} /> },
   { key: 'projects', label: 'Projects', render: (v) => v.projects?.join(', ') || '—' },
-  { key: 'invoiceCount', label: 'Invoices', className: 'text-right tabular-nums' },
   { key: 'latestInvoiceDate', label: 'Last Invoice', render: (v) => formatDate(v.latestInvoiceDate) },
   { key: '_override', label: '', render: (v, { onOverride }) => (
     <button
@@ -177,34 +193,31 @@ const notClearedColumns = [
 ]
 
 const expiringColumns = [
-  { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900' },
+  { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900', render: (v) => <VendorName v={v} /> },
   { key: 'nextStatus', label: 'Next Period', render: (v) => <StatusBadge value={v.nextStatus} /> },
   { key: '_activity', label: 'Activity', render: (v) => <ActivityDot active={v.hasRecentActivity} /> },
   { key: 'projects', label: 'Projects', render: (v) => v.projects?.join(', ') || '—' },
-  { key: 'invoiceCount', label: 'Invoices', className: 'text-right tabular-nums' },
   { key: 'latestInvoiceDate', label: 'Last Invoice', render: (v) => formatDate(v.latestInvoiceDate) },
 ]
 
 const clearedColumns = [
-  { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900' },
+  { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900', render: (v) => <VendorName v={v} /> },
   { key: 'currentStatus', label: 'WSIB Status', render: (v) => <StatusBadge value={v.currentStatus} /> },
   { key: '_activity', label: 'Activity', render: (v) => <ActivityDot active={v.hasRecentActivity} /> },
   { key: 'projects', label: 'Projects', render: (v) => v.projects?.join(', ') || '—' },
-  { key: 'invoiceCount', label: 'Invoices', className: 'text-right tabular-nums' },
   { key: 'latestInvoiceDate', label: 'Last Invoice', render: (v) => formatDate(v.latestInvoiceDate) },
 ]
 
 const coiColumns = [
-  { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900' },
+  { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900', render: (v) => <VendorName v={v} /> },
   { key: 'coiExpiryDate', label: 'COI Expired', render: (v) => formatDate(v.coiExpiryDate) },
   { key: 'currentStatus', label: 'WSIB Status', render: (v) => <StatusBadge value={v.currentStatus} /> },
   { key: '_activity', label: 'Activity', render: (v) => <ActivityDot active={v.hasRecentActivity} /> },
   { key: 'projects', label: 'Projects', render: (v) => v.projects?.join(', ') || '—' },
-  { key: 'invoiceCount', label: 'Invoices', className: 'text-right tabular-nums' },
 ]
 
 const excludedColumns = [
-  { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900' },
+  { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900', render: (v) => <VendorName v={v} /> },
   { key: 'overrideStatus', label: 'Status', render: (v) => (
     <span className="text-xs font-medium bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
       {OVERRIDE_LABELS[v.overrideStatus] || v.overrideStatus}
@@ -213,13 +226,11 @@ const excludedColumns = [
   { key: 'overrideReason', label: 'Reason', className: 'text-gray-500' },
   { key: '_activity', label: 'Activity', render: (v) => <ActivityDot active={v.hasRecentActivity} /> },
   { key: 'projects', label: 'Projects', render: (v) => v.projects?.join(', ') || '—' },
-  { key: 'invoiceCount', label: 'Invoices', className: 'text-right tabular-nums' },
 ]
 
 const untrackedColumns = [
   { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900' },
   { key: 'projects', label: 'Projects', render: (v) => v.projects?.join(', ') || '—' },
-  { key: 'invoiceCount', label: 'Invoices', className: 'text-right tabular-nums' },
   { key: 'latestInvoiceDate', label: 'Last Invoice', render: (v) => formatDate(v.latestInvoiceDate) },
   { key: '_override', label: '', render: (v, { onOverride }) => onOverride ? (
     <button
