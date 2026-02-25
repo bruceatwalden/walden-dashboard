@@ -98,7 +98,7 @@ function computeJustifiedRows(items, containerWidth, targetHeight, gap) {
 // ---------------------------------------------------------------------------
 
 export default function PhotoGallery() {
-  const [filter, setFilter] = useState({ preset: 'week' })
+  const [filter, setFilter] = useState({ preset: 'month' })
   const { start, end } = getGalleryDateRange(filter.preset, filter.customStart, filter.customEnd)
 
   const queryFn = useCallback(() => getPhotoGallery(start, end), [start, end])
