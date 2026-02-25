@@ -45,6 +45,8 @@ function CMCard({ cm }) {
   const inactive = cm.total === 0
 
   const stats = [
+    { label: 'Entries', value: cm.entries },
+    { label: 'Photos', value: cm.photos },
     { label: 'Recordings', value: cm.recordings },
     { label: 'Processed', value: cm.processing },
     { label: 'Submitted', value: cm.submissions },

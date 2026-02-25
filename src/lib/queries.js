@@ -147,22 +147,43 @@ export async function getProjectOverview(startDate, endDate) {
 export async function getCMActivity(startDate, endDate) {
   const dayAfterEnd = getNextDate(endDate)
 
-  const { data, error } = await supabase
-    .from('usage_logs')
-    .select('user_id, user_name, action')
-    .not('user_id', 'is', null)
-    .gte('created_at', startDate + 'T00:00:00')
-    .lt('created_at', dayAfterEnd + 'T00:00:00')
+  const [logsResult, entriesResult, photosResult] = await Promise.all([
+    supabase
+      .from('usage_logs')
+      .select('user_id, user_name, action')
+      .not('user_id', 'is', null)
+      .gte('created_at', startDate + 'T00:00:00')
+      .lt('created_at', dayAfterEnd + 'T00:00:00'),
+    supabase
+      .from('site_log_entries')
+      .select('construction_manager')
+      .not('construction_manager', 'is', null)
+      .gte('entry_date', startDate)
+      .lte('entry_date', endDate),
+    supabase
+      .from('site_photos')
+      .select('uploaded_by, uploaded_by_name')
+      .not('uploaded_by', 'is', null)
+      .gte('photo_date', startDate)
+      .lte('photo_date', endDate),
+  ])
 
-  if (error) throw error
+  if (logsResult.error) throw logsResult.error
+  if (entriesResult.error) throw entriesResult.error
+  if (photosResult.error) throw photosResult.error
 
-  // Group by user
-  const byUser = {}
-  for (const row of data || []) {
-    if (!byUser[row.user_id]) {
-      byUser[row.user_id] = {
-        id: row.user_id,
-        name: row.user_name,
+  // Merge all three sources by normalized name
+  const byName = {}
+
+  function getOrCreate(name) {
+    const key = name.trim().toLowerCase()
+    if (!key) return null
+    if (!byName[key]) {
+      byName[key] = {
+        id: key,
+        name: name.trim(),
+        entries: 0,
+        photos: 0,
         recordings: 0,
         processing: 0,
         submissions: 0,
@@ -172,7 +193,13 @@ export async function getCMActivity(startDate, endDate) {
         total: 0,
       }
     }
-    const u = byUser[row.user_id]
+    return byName[key]
+  }
+
+  for (const row of logsResult.data || []) {
+    const u = getOrCreate(row.user_name)
+    if (!u) continue
+    u.id = row.user_id
     u.total++
     switch (row.action) {
       case 'recording_saved': u.recordings++; break
@@ -184,7 +211,22 @@ export async function getCMActivity(startDate, endDate) {
     }
   }
 
-  return Object.values(byUser).sort((a, b) => a.name.localeCompare(b.name))
+  for (const row of entriesResult.data || []) {
+    const u = getOrCreate(row.construction_manager)
+    if (!u) continue
+    u.entries++
+    u.total++
+  }
+
+  for (const row of photosResult.data || []) {
+    const u = getOrCreate(row.uploaded_by_name)
+    if (!u) continue
+    u.id = row.uploaded_by
+    u.photos++
+    u.total++
+  }
+
+  return Object.values(byName).sort((a, b) => a.name.localeCompare(b.name))
 }
 
 // --- B3: Entry Volume Trend ---
@@ -615,7 +657,7 @@ export async function getPhotoActivity(startDate, endDate, projectId) {
 export async function getPhotoGallery(startDate, endDate) {
   let photosQuery = supabase
     .from('site_photos')
-    .select('id, project_id, thumb_path, file_path, photo_date, client_visible, construction_phases, instagram_worthy, visual_quality_score')
+    .select('id, project_id, thumb_path, file_path, photo_date, client_visible, construction_phases, instagram_worthy, visual_quality_score, time_taken, created_at')
   if (startDate) photosQuery = photosQuery.gte('photo_date', startDate)
   if (endDate) photosQuery = photosQuery.lte('photo_date', endDate)
   photosQuery = photosQuery
@@ -644,6 +686,7 @@ export async function getPhotoGallery(startDate, endDate) {
         projectName: projectNames[pid] || 'Unknown',
         dateGroups: {},
         total: 0,
+        lastUpdated: null,
       }
     }
     const group = byProject[pid]
@@ -662,6 +705,10 @@ export async function getPhotoGallery(startDate, endDate) {
       qualityScore: photo.visual_quality_score,
     })
     group.total++
+    const ts = photo.time_taken || photo.created_at
+    if (ts && (!group.lastUpdated || ts > group.lastUpdated)) {
+      group.lastUpdated = ts
+    }
   }
 
   return Object.values(byProject)
