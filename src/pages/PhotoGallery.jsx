@@ -35,6 +35,18 @@ function getGalleryDateRange(preset, customStart, customEnd) {
   }
 }
 
+function formatLastUpdated(isoString) {
+  const d = new Date(isoString)
+  return d.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  }) + ' at ' + d.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  })
+}
+
 const PRESETS = [
   { label: 'This Week', value: 'week' },
   { label: 'This Month', value: 'month' },
@@ -362,6 +374,11 @@ function ProjectSection({ project, isExpanded, onToggle, onPhotoClick }) {
           <span className="text-xs text-gray-400 tabular-nums shrink-0">
             {project.total}
           </span>
+          {project.lastUpdated && (
+            <span className="text-xs text-gray-300 shrink-0 hidden sm:inline">
+              Last updated: {formatLastUpdated(project.lastUpdated)}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3 shrink-0">
           {!isExpanded && (
