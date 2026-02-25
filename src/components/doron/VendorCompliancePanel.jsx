@@ -19,6 +19,7 @@ export default function VendorCompliancePanel({ days = 90, onDataLoaded }) {
       ...data.summary,
       currentPeriod: data.currentPeriod,
       nextPeriod: data.nextPeriod,
+      liveCheckSummary: data.liveCheckSummary,
     })
     return data
   }, [days, onDataLoaded])
@@ -37,6 +38,7 @@ export default function VendorCompliancePanel({ days = 90, onDataLoaded }) {
   return (
     <div className="space-y-6">
       {data && <PeriodBar currentPeriod={data.currentPeriod} nextPeriod={data.nextPeriod} />}
+      {data?.liveCheckSummary && <LiveCheckBar summary={data.liveCheckSummary} />}
 
       <VendorSection
         title="Not Cleared"
@@ -64,6 +66,11 @@ export default function VendorCompliancePanel({ days = 90, onDataLoaded }) {
         loading={loading && !data}
         color="green"
         columns={clearedColumns}
+        rowClassName={(v) =>
+          v.currentStatus === 'Yes' && v.wsibLiveStatus === 'not_eligible'
+            ? 'bg-red-50/60 hover:bg-red-100/60'
+            : 'hover:bg-gray-50'
+        }
       />
       <VendorSection
         title="COI Expired"
@@ -145,6 +152,32 @@ function PeriodBar({ currentPeriod, nextPeriod }) {
   )
 }
 
+// --- Live check bar ---
+
+function LiveCheckBar({ summary }) {
+  const checkedAt = summary.checkedAt
+    ? new Date(summary.checkedAt).toLocaleString('en-US', {
+        month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+      })
+    : null
+
+  return (
+    <div className="bg-purple-50/60 border border-purple-200 rounded-lg px-5 py-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-sm">
+      <span className="font-medium text-purple-900">Live Check:</span>
+      <span className="text-green-700 font-medium">{summary.eligible ?? 0} Eligible</span>
+      <span className="text-gray-400">·</span>
+      <span className="text-red-700 font-medium">{summary.notEligible ?? 0} Not Eligible</span>
+      <span className="text-gray-400">·</span>
+      <span className="text-gray-500 font-medium">{summary.notFound ?? 0} Not Found</span>
+      <span className="text-gray-400">·</span>
+      <span className="text-amber-700 font-medium">{summary.multipleResults ?? 0} Multiple Results</span>
+      {checkedAt && (
+        <span className="ml-auto text-xs text-purple-400">Checked {checkedAt}</span>
+      )}
+    </div>
+  )
+}
+
 // --- Activity indicator ---
 
 function ActivityDot({ active }) {
@@ -174,11 +207,46 @@ function VendorName({ v }) {
   )
 }
 
+// --- Live status badge ---
+
+const LIVE_STATUS_CONFIG = {
+  eligible:         { label: 'Eligible',         style: 'bg-green-50 text-green-700' },
+  not_eligible:     { label: 'Not Eligible',     style: 'bg-red-50 text-red-700' },
+  not_found:        { label: 'Not Found',        style: 'bg-gray-100 text-gray-500' },
+  multiple_results: { label: 'Multiple Results', style: 'bg-amber-50 text-amber-700' },
+}
+
+function LiveStatusBadge({ value }) {
+  if (!value) return <span className="text-xs text-gray-300">—</span>
+  const cfg = LIVE_STATUS_CONFIG[value] || { label: value, style: 'bg-gray-100 text-gray-500' }
+  return (
+    <span className={`text-xs font-medium px-2 py-0.5 rounded-full whitespace-nowrap ${cfg.style}`}>
+      {cfg.label}
+    </span>
+  )
+}
+
+function MismatchWarning({ v }) {
+  if (v.currentStatus !== 'Yes' || v.wsibLiveStatus !== 'not_eligible') return null
+  return (
+    <span
+      title="Smartsheet says Cleared but WSIB live check says Not Eligible"
+      className="inline-flex items-center gap-1 text-xs font-semibold text-red-700 bg-red-100 px-2 py-0.5 rounded-full whitespace-nowrap"
+    >
+      <svg className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+        <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.168 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 6a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 6zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+      </svg>
+      Mismatch
+    </span>
+  )
+}
+
 // --- Column definitions ---
 
 const notClearedColumns = [
   { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900', render: (v) => <VendorName v={v} /> },
   { key: 'currentStatus', label: 'WSIB Status', render: (v) => <StatusBadge value={v.currentStatus} /> },
+  { key: '_liveStatus', label: 'Live Status', render: (v) => <LiveStatusBadge value={v.wsibLiveStatus} /> },
   { key: '_activity', label: 'Activity', render: (v) => <ActivityDot active={v.hasRecentActivity} /> },
   { key: 'projects', label: 'Projects', render: (v) => v.projects?.join(', ') || '—' },
   { key: 'latestInvoiceDate', label: 'Last Invoice', render: (v) => formatDate(v.latestInvoiceDate) },
@@ -195,6 +263,7 @@ const notClearedColumns = [
 const expiringColumns = [
   { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900', render: (v) => <VendorName v={v} /> },
   { key: 'nextStatus', label: 'Next Period', render: (v) => <StatusBadge value={v.nextStatus} /> },
+  { key: '_liveStatus', label: 'Live Status', render: (v) => <LiveStatusBadge value={v.wsibLiveStatus} /> },
   { key: '_activity', label: 'Activity', render: (v) => <ActivityDot active={v.hasRecentActivity} /> },
   { key: 'projects', label: 'Projects', render: (v) => v.projects?.join(', ') || '—' },
   { key: 'latestInvoiceDate', label: 'Last Invoice', render: (v) => formatDate(v.latestInvoiceDate) },
@@ -203,6 +272,12 @@ const expiringColumns = [
 const clearedColumns = [
   { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900', render: (v) => <VendorName v={v} /> },
   { key: 'currentStatus', label: 'WSIB Status', render: (v) => <StatusBadge value={v.currentStatus} /> },
+  { key: '_liveStatus', label: 'Live Status', render: (v) => (
+    <span className="inline-flex items-center gap-1.5">
+      <LiveStatusBadge value={v.wsibLiveStatus} />
+      <MismatchWarning v={v} />
+    </span>
+  )},
   { key: '_activity', label: 'Activity', render: (v) => <ActivityDot active={v.hasRecentActivity} /> },
   { key: 'projects', label: 'Projects', render: (v) => v.projects?.join(', ') || '—' },
   { key: 'latestInvoiceDate', label: 'Last Invoice', render: (v) => formatDate(v.latestInvoiceDate) },
@@ -212,6 +287,7 @@ const coiColumns = [
   { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900', render: (v) => <VendorName v={v} /> },
   { key: 'coiExpiryDate', label: 'COI Expired', render: (v) => formatDate(v.coiExpiryDate) },
   { key: 'currentStatus', label: 'WSIB Status', render: (v) => <StatusBadge value={v.currentStatus} /> },
+  { key: '_liveStatus', label: 'Live Status', render: (v) => <LiveStatusBadge value={v.wsibLiveStatus} /> },
   { key: '_activity', label: 'Activity', render: (v) => <ActivityDot active={v.hasRecentActivity} /> },
   { key: 'projects', label: 'Projects', render: (v) => v.projects?.join(', ') || '—' },
 ]
@@ -223,6 +299,7 @@ const excludedColumns = [
       {OVERRIDE_LABELS[v.overrideStatus] || v.overrideStatus}
     </span>
   )},
+  { key: '_liveStatus', label: 'Live Status', render: (v) => <LiveStatusBadge value={v.wsibLiveStatus} /> },
   { key: 'overrideReason', label: 'Reason', className: 'text-gray-500' },
   { key: '_activity', label: 'Activity', render: (v) => <ActivityDot active={v.hasRecentActivity} /> },
   { key: 'projects', label: 'Projects', render: (v) => v.projects?.join(', ') || '—' },
@@ -230,6 +307,7 @@ const excludedColumns = [
 
 const untrackedColumns = [
   { key: 'vendor', label: 'Vendor', className: 'font-medium text-gray-900' },
+  { key: '_liveStatus', label: 'Live Status', render: (v) => <LiveStatusBadge value={v.wsibLiveStatus} /> },
   { key: 'projects', label: 'Projects', render: (v) => v.projects?.join(', ') || '—' },
   { key: 'latestInvoiceDate', label: 'Last Invoice', render: (v) => formatDate(v.latestInvoiceDate) },
   { key: '_override', label: '', render: (v, { onOverride }) => onOverride ? (
@@ -285,7 +363,7 @@ const COLOR_MAP = {
 
 // --- VendorSection (collapsible) ---
 
-function VendorSection({ title, description, items, loading, color, columns, onOverride, defaultOpen = false }) {
+function VendorSection({ title, description, items, loading, color, columns, onOverride, defaultOpen = false, rowClassName }) {
   const [open, setOpen] = useState(defaultOpen)
   const c = COLOR_MAP[color]
   const count = items?.length ?? 0
@@ -339,7 +417,7 @@ function VendorSection({ title, description, items, loading, color, columns, onO
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {items.map((item, i) => (
-                    <tr key={i} className="hover:bg-gray-50">
+                    <tr key={i} className={rowClassName ? rowClassName(item) : 'hover:bg-gray-50'}>
                       {columns.map((col) => (
                         <td key={col.key} className={`px-6 py-3 ${col.className || 'text-gray-600'}`}>
                           {col.render ? col.render(item, { onOverride }) : (item[col.key] ?? '—')}

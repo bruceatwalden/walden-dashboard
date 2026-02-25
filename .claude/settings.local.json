@@ -9,7 +9,10 @@
       "Bash(npm run build:*)",
       "Bash(head:*)",
       "Bash(grep:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(tail:*)",
+      "Bash(cd /c/Users/Bruce/walden-dashboard && npx vercel 2>&1)",
+      "Bash(cd /c/Users/Bruce/walden-dashboard && npx vercel --prod 2>&1)"
     ]
   }
 }
