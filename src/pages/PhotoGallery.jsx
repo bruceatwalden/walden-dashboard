@@ -416,14 +416,14 @@ function ProjectSection({ project, isExpanded, onToggle, onPhotoClick }) {
               cumulativeIndex += photos.length
 
               return (
-                <div key={date} className="mt-5">
+                <div key={date} className="mt-8 first:mt-5">
                   {/* Date header */}
-                  <div className="flex items-center gap-3 mb-3">
-                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide shrink-0">
+                  <div className="flex items-center gap-4 mb-4">
+                    <p className="text-sm font-bold text-gray-500 uppercase tracking-wider shrink-0">
                       {formatDateHeader(date)}
                     </p>
-                    <div className="flex-1 h-px bg-gray-100" />
-                    <span className="text-[10px] text-gray-300 tabular-nums shrink-0">
+                    <div className="flex-1 h-px bg-gray-200" />
+                    <span className="text-xs text-gray-400 tabular-nums shrink-0">
                       {photos.length}
                     </span>
                   </div>
