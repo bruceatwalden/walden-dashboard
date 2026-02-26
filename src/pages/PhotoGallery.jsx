@@ -411,18 +411,23 @@ function ProjectSection({ project, isExpanded, onToggle, onPhotoClick }) {
         <div className="px-5 pb-5 border-t border-gray-100">
           {(() => {
             let cumulativeIndex = 0
-            return project.dateGroups.map(({ date, photos }) => {
+            return project.dateGroups.map(({ date, photos, weatherTemp, weatherDesc }) => {
               const startIdx = cumulativeIndex
               cumulativeIndex += photos.length
 
               return (
-                <div key={date} className="mt-8 first:mt-5">
+                <div key={date} className="mt-10 first:mt-5">
                   {/* Date header */}
                   <div className="flex items-center gap-4 mb-4">
-                    <p className="text-sm font-bold text-gray-500 uppercase tracking-wider shrink-0">
+                    <p className="text-lg font-bold text-gray-700 shrink-0">
                       {formatDateHeader(date)}
+                      {weatherDesc != null && (
+                        <span className="text-sm font-normal text-gray-400 ml-2">
+                          &middot; {weatherTemp != null ? `${Math.round(weatherTemp)}°C ` : ''}{weatherDesc}
+                        </span>
+                      )}
                     </p>
-                    <div className="flex-1 h-px bg-gray-200" />
+                    <div className="flex-1 h-[2px] bg-gray-300" />
                     <span className="text-xs text-gray-400 tabular-nums shrink-0">
                       {photos.length}
                     </span>

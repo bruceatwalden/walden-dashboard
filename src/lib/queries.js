@@ -664,13 +664,29 @@ export async function getPhotoGallery(startDate, endDate) {
     .order('photo_date', { ascending: false })
     .order('time_taken', { ascending: false })
 
-  const [photosResult, projectsResult] = await Promise.all([
+  let weatherQuery = supabase
+    .from('photo_date_info')
+    .select('project_id, info_date, weather_temp, weather_code, weather_desc')
+  if (startDate) weatherQuery = weatherQuery.gte('info_date', startDate)
+  if (endDate) weatherQuery = weatherQuery.lte('info_date', endDate)
+
+  const [photosResult, projectsResult, weatherResult] = await Promise.all([
     photosQuery,
     supabase.from('projects').select('id, name').order('name'),
+    weatherQuery,
   ])
 
   if (photosResult.error) throw photosResult.error
   if (projectsResult.error) throw projectsResult.error
+  // weather is non-critical — don't throw on error
+  const weatherByKey = {}
+  for (const w of weatherResult.data || []) {
+    weatherByKey[`${w.project_id}:${w.info_date}`] = {
+      weatherTemp: w.weather_temp,
+      weatherCode: w.weather_code,
+      weatherDesc: w.weather_desc,
+    }
+  }
 
   const projectNames = {}
   for (const p of projectsResult.data) {
@@ -716,7 +732,11 @@ export async function getPhotoGallery(startDate, endDate) {
       ...p,
       dateGroups: Object.entries(p.dateGroups)
         .sort(([a], [b]) => b.localeCompare(a))
-        .map(([date, photos]) => ({ date, photos })),
+        .map(([date, photos]) => ({
+          date,
+          photos,
+          ...weatherByKey[`${p.projectId}:${date}`],
+        })),
     }))
     .sort((a, b) => a.projectName.localeCompare(b.projectName))
 }
