@@ -1,8 +1,6 @@
 import { useCallback, useState } from 'react'
 import { useDashboardQuery } from '../../hooks/useDashboardQuery'
 import { getVendorCompliance, postVendorOverride } from '../../lib/api'
-import VendorComplianceHelp from './VendorComplianceHelp'
-import ReportProblemModal from './ReportProblemModal'
 
 const OVERRIDE_LABELS = {
   not_required: 'Not Required',
@@ -14,8 +12,6 @@ const OVERRIDE_LABELS = {
 
 export default function VendorCompliancePanel({ days = 90, onDataLoaded }) {
   const [overrideTarget, setOverrideTarget] = useState(null)
-  const [showHelp, setShowHelp] = useState(false)
-  const [reportType, setReportType] = useState(null) // null = closed; 'bug' | 'idea' = open
 
   const queryFn = useCallback(async () => {
     const data = await getVendorCompliance(days)
@@ -41,32 +37,6 @@ export default function VendorCompliancePanel({ days = 90, onDataLoaded }) {
 
   return (
     <div className="space-y-6">
-      {/* Header: title + help / report buttons */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h2 className="text-sm font-semibold text-gray-900">Vendor Compliance (WSIB)</h2>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowHelp(true)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="9" />
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 16v-4M12 8h.01" />
-            </svg>
-            How this works
-          </button>
-          <button
-            onClick={() => setReportType('bug')}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3 21v-4l11-11 4 4L7 21H3zM14 6l4 4" />
-            </svg>
-            Report a problem
-          </button>
-        </div>
-      </div>
-
       {data && <PeriodBar currentPeriod={data.currentPeriod} nextPeriod={data.nextPeriod} />}
       {data?.liveCheckSummary && <LiveCheckBar summary={data.liveCheckSummary} />}
 
@@ -134,20 +104,6 @@ export default function VendorCompliancePanel({ days = 90, onDataLoaded }) {
           vendor={overrideTarget}
           onClose={() => setOverrideTarget(null)}
           onSaved={() => { setOverrideTarget(null); refetch() }}
-        />
-      )}
-
-      {showHelp && (
-        <VendorComplianceHelp
-          onClose={() => setShowHelp(false)}
-          onAskQuestion={() => { setShowHelp(false); setReportType('idea') }}
-        />
-      )}
-
-      {reportType && (
-        <ReportProblemModal
-          initialType={reportType}
-          onClose={() => setReportType(null)}
         />
       )}
     </div>
