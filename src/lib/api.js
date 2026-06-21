@@ -32,3 +32,19 @@ export async function postVendorOverride(body) {
   }
   return res.json()
 }
+
+// Files a "report a problem / ask a question" into the shared work_inbox queue
+// (the dashboard has no direct Supabase client, so it goes through the backend).
+// The report then surfaces on Bruce's local Session Board automatically.
+export async function submitWorkInboxReport(body) {
+  const res = await fetch(`${BACKEND_URL}/work-inbox-submit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}))
+    throw new Error(data.error || `Backend API error (${res.status})`)
+  }
+  return res.json()
+}
