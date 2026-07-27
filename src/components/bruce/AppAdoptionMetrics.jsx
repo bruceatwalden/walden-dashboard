@@ -9,7 +9,10 @@ const METRICS = [
   { key: 'photos', label: 'Photos Uploaded' },
   { key: 'submissions', label: 'Smartsheet Submissions' },
   { key: 'looms', label: 'Looms' },
-  { key: 'emails', label: 'Emails' },
+  // Counted from the activity log ('email_drafted'), which fires when the AI
+  // writes a draft — not when an email is finished or sent. See the note in
+  // CMActivityScorecard.jsx.
+  { key: 'emails', label: 'Drafts started' },
 ]
 
 export default function AppAdoptionMetrics() {

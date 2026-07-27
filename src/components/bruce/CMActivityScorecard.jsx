@@ -50,7 +50,13 @@ function CMCard({ cm }) {
     { label: 'Recordings', value: cm.recordings },
     { label: 'Processed', value: cm.processing },
     { label: 'Submitted', value: cm.submissions },
-    { label: 'Emails', value: cm.emails },
+    // "Drafts started", not "Emails". This number comes from the activity log
+    // ('email_drafted'), which fires the moment the AI writes a draft — before
+    // any document, before any send, and even if the CM abandons it. The project
+    // grid's "Emails" column counts something different (rows in cm_emails,
+    // drafts excluded). Two numbers, two meanings — so they get two names, or
+    // they read as a discrepancy the day the drafts shelf lands.
+    { label: 'Drafts started', value: cm.emails },
     { label: 'Looms', value: cm.looms },
     { label: 'Meetings', value: cm.meetings },
   ].filter((s) => s.value > 0)
