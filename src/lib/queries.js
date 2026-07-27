@@ -59,10 +59,18 @@ export async function getProjectOverview(startDate, endDate) {
       .gte('photo_date', startDate)
       .lte('photo_date', endDate),
 
-    // Emails in date range (created_at is timestamptz)
+    // Emails in date range (created_at is timestamptz).
+    // Drafts excluded: cm_emails.status defaults to 'draft', and Site Log is about
+    // to start saving unfinished drafts as real rows. A draft is not an email the
+    // CM produced, so it must not appear in this count.
+    // Written as .or() and not .neq() on purpose — `status <> 'draft'` is NULL for
+    // a NULL status, so a bare .neq() would drop real rows whose status is null.
+    // Site Log keeps the same rule in src/lib/emailStatus.js + api/_lib/email-status.js;
+    // separate repos, so the three copies change together.
     supabase
       .from('cm_emails')
       .select('project_id')
+      .or('status.is.null,status.neq.draft')
       .gte('created_at', startDate + 'T00:00:00')
       .lt('created_at', dayAfterEnd + 'T00:00:00'),
 
