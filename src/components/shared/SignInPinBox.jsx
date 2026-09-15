@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { requestSignInTicket, storeSignInTicket } from '../../lib/auth'
+import { requestSignInTicket, storeSignInTicket, revokeSignInTicket } from '../../lib/auth'
 
 // The PIN, asked for ONCE, when a page needs a sign-in ticket and this sign-in has none.
 // ⛔ The ticket is kept only if the server says the PIN belongs to the person signed in here.
@@ -15,9 +15,10 @@ export default function SignInPinBox({ user, message, onConfirmed }) {
     setChecking(true)
     setError(null)
     try {
-      const { token, userId } = await requestSignInTicket(pin)
+      const { token, userId } = await requestSignInTicket(pin, user?.id)
       if (userId !== user?.id) {
-        setError('That PIN belongs to someone else. Enter your own PIN.')
+        revokeSignInTicket(token) // a ticket that is not this person's must not be left behind
+        setError('That PIN did not work. Enter your own PIN.')
         return
       }
       storeSignInTicket(token, userId)

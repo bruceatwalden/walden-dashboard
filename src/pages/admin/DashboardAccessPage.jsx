@@ -24,6 +24,8 @@ export default function DashboardAccessPage() {
   // `error` is read now: the staff list needs a sign-in ticket (2026-09-15), and without it the
   // page used to say "No admin or coordinator users found", which is not true.
   const { data: users, loading, error, refetch } = useDashboardQuery(fetchUsers, 0)
+  // Between the PIN being accepted and the list arriving, say "loading", not "no users found".
+  const [retrying, setRetrying] = useState(false)
 
   const [permissions, setPermissions] = useState({})
   const [dirty, setDirty] = useState(false)
@@ -108,7 +110,7 @@ export default function DashboardAccessPage() {
       )}
 
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        {loading ? (
+        {loading || retrying ? (
           <div className="p-8 text-center text-sm text-gray-400">Loading users...</div>
         ) : error ? (
           <div className="p-6">
@@ -116,7 +118,10 @@ export default function DashboardAccessPage() {
               <SignInPinBox
                 user={user}
                 message="The staff list needs your PIN, once."
-                onConfirmed={() => refetch()}
+                onConfirmed={async () => {
+                  setRetrying(true)
+                  try { await refetch() } finally { setRetrying(false) }
+                }}
               />
             ) : (
               <p className="text-sm text-red-600">{error.message}</p>

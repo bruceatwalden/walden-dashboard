@@ -1613,7 +1613,8 @@ export async function unresolveAlert(transcriptItemId) {
 
 // Through the shared back end's staff-account door, with the admin's sign-in ticket (2026-09-15).
 // It used to call the staff list routine straight from the browser, where the published key and
-// Bruce's id let anyone read every staff member's email and phone. `callerId` is kept so the page
+// Bruce's id let anyone read every staff member's email and phone — and still can, directly, until
+// migration 247 takes the routine away from the published key. `callerId` is kept so the page
 // does not change; the ticket says who is asking. Throws an Error with `.code` ('sign_in_needed' …).
 // `token` overrides the stored ticket (the PIN box hands over a fresh one).
 // eslint-disable-next-line no-unused-vars

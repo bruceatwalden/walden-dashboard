@@ -15,13 +15,14 @@ const BACKEND_URL = 'https://walden-backend.vercel.app'
  * Ask the shared back end to check a PIN and issue a Dashboard sign-in ticket.
  * Resolves { token, userId }; throws an Error with a plain message and `.code`.
  */
-export async function requestSignInTicket(pin) {
+// `userId` — the account signing in; the server accepts the PIN only for that account.
+export async function requestSignInTicket(pin, userId) {
   let res
   try {
     res = await fetch(`${BACKEND_URL}/api/staff-session`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'sign-in', pin, app_id: 'dashboard' }),
+      body: JSON.stringify({ action: 'sign-in', pin, app_id: 'dashboard', user_id: userId }),
     })
   } catch {
     const err = new Error('Your PIN could not be checked just now — check the connection and try again.')
@@ -81,16 +82,20 @@ export function saveSession(user) {
 export function clearSession() {
   let token = null
   try { token = JSON.parse(localStorage.getItem(TICKET_KEY) || 'null')?.token || null } catch { /* none */ }
-  if (token) {
-    fetch(`${BACKEND_URL}/api/staff-session`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'sign-out', actor_token: token }),
-      keepalive: true,
-    }).catch(() => { /* it still expires within seven days */ })
-  }
+  if (token) revokeSignInTicket(token)
   localStorage.removeItem(TICKET_KEY)
   localStorage.removeItem(SESSION_KEY)
+}
+
+// Cancel a ticket on the server, best-effort — at sign-out, and when a PIN box gets someone else's PIN.
+export function revokeSignInTicket(token) {
+  if (!token) return
+  fetch(`${BACKEND_URL}/api/staff-session`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'sign-out', actor_token: token }),
+    keepalive: true,
+  }).catch(() => { /* it still expires within seven days */ })
 }
 
 export async function login(pin) {
@@ -109,7 +114,7 @@ export async function login(pin) {
   // An admin also gets a sign-in ticket, in the background; sign-in never waits on it. If it does
   // not arrive, the Dashboard access page asks for the PIN once.
   if (data.id && data.role === 'admin') {
-    requestSignInTicket(pin)
+    requestSignInTicket(pin, data.id)
       .then(({ token, userId }) => { if (userId === data.id) storeSignInTicket(token, userId) })
       .catch(() => { /* the access page asks for the PIN if it is ever needed */ })
   }
