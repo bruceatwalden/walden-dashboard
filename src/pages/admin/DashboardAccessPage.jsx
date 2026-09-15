@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react'
 import { getCMUsers } from '../../lib/queries'
 import { useDashboardQuery } from '../../hooks/useDashboardQuery'
 import { useAuth } from '../../hooks/useAuth'
+import SignInPinBox from '../../components/shared/SignInPinBox'
 import {
   ALL_DASHBOARDS,
   getDashboardPermissions,
@@ -20,7 +21,9 @@ const DEFAULT_PERMISSIONS_BY_NAME = {
 export default function DashboardAccessPage() {
   const { user } = useAuth()
   const fetchUsers = useCallback(() => getCMUsers(user.id), [user.id])
-  const { data: users, loading } = useDashboardQuery(fetchUsers, 0)
+  // `error` is read now: the staff list needs a sign-in ticket (2026-09-15), and without it the
+  // page used to say "No admin or coordinator users found", which is not true.
+  const { data: users, loading, error, refetch } = useDashboardQuery(fetchUsers, 0)
 
   const [permissions, setPermissions] = useState({})
   const [dirty, setDirty] = useState(false)
@@ -107,6 +110,18 @@ export default function DashboardAccessPage() {
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-sm text-gray-400">Loading users...</div>
+        ) : error ? (
+          <div className="p-6">
+            {error.code === 'sign_in_needed' ? (
+              <SignInPinBox
+                user={user}
+                message="The staff list needs your PIN, once."
+                onConfirmed={() => refetch()}
+              />
+            ) : (
+              <p className="text-sm text-red-600">{error.message}</p>
+            )}
+          </div>
         ) : !dashboardUsers.length ? (
           <div className="p-8 text-center text-sm text-gray-400">
             No admin or coordinator users found.

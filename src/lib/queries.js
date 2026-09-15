@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { getSignInTicket } from './auth'
 
 // --- Projects ---
 
@@ -1610,12 +1611,32 @@ export async function unresolveAlert(transcriptItemId) {
 
 // --- Admin: CM Users ---
 
-export async function getCMUsers(callerId) {
-  const { data, error } = await supabase.rpc('list_cm_users', {
-    caller_id: callerId,
-  })
-  if (error) throw error
-  return data
+// Through the shared back end's staff-account door, with the admin's sign-in ticket (2026-09-15).
+// It used to call the staff list routine straight from the browser, where the published key and
+// Bruce's id let anyone read every staff member's email and phone. `callerId` is kept so the page
+// does not change; the ticket says who is asking. Throws an Error with `.code` ('sign_in_needed' …).
+// `token` overrides the stored ticket (the PIN box hands over a fresh one).
+// eslint-disable-next-line no-unused-vars
+export async function getCMUsers(callerId, token) {
+  let res
+  try {
+    res = await fetch('https://walden-backend.vercel.app/api/staff-accounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'list_staff', actor_token: token || getSignInTicket() || undefined }),
+    })
+  } catch {
+    const err = new Error('The staff list could not be reached — check the connection and try again.')
+    err.code = 'unavailable'
+    throw err
+  }
+  const json = await res.json().catch(() => ({}))
+  if (!res.ok || !json.ok) {
+    const err = new Error(json.error || 'The staff list could not be loaded. Try again.')
+    err.code = json.code
+    throw err
+  }
+  return json.users || []
 }
 
 export async function updateCMUser(id, updates) {
