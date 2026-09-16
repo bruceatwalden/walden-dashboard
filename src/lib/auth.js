@@ -25,7 +25,11 @@ export async function requestSignInTicket(pin, userId) {
       body: JSON.stringify({ action: 'sign-in', pin, app_id: 'dashboard', user_id: userId }),
     })
   } catch {
-    const err = new Error('Your PIN could not be checked just now — check the connection and try again.')
+    const err = new Error(
+      'The Dashboard has not been given permission to reach the Walden back end yet: its web '
+      + 'address is not on the back end list. Nothing is wrong with your PIN. Ask Bruce to have '
+      + 'the Dashboard address registered.'
+    )
     err.code = 'unavailable'
     throw err
   }

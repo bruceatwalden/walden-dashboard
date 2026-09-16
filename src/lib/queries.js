@@ -1627,7 +1627,10 @@ export async function getCMUsers(callerId, token) {
       body: JSON.stringify({ action: 'list_staff', actor_token: token || getSignInTicket() || undefined }),
     })
   } catch {
-    const err = new Error('The staff list could not be reached — check the connection and try again.')
+    const err = new Error(
+      'The staff list could not be reached: the Dashboard web address is not on the Walden back '
+      + 'end allowed list yet, so the browser refuses the call. Ask Bruce to have it registered.'
+    )
     err.code = 'unavailable'
     throw err
   }
