@@ -103,3 +103,10 @@ test('⛔ a right PIN for somebody who is not an admin or coordinator is told so
   assert.deepEqual(await auth.login('1234'), { access_denied: true })
   assert.equal(rpcCalls.length, 0)
 })
+
+test('⛔ a 403 that is not the back end's own "no access" (a firewall, say) is "could not check" — never "no access", never a fall-back', async () => {
+  fresh()
+  globalThis.fetch = answer(403, { error: 'Forbidden' })
+  await assert.rejects(auth.login('1234'), (e) => e.message !== 'ACCESS_DENIED' && e.code !== 'no_access')
+  assert.equal(rpcCalls.length, 0)
+})

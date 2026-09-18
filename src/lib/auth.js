@@ -66,7 +66,12 @@ export async function login(pin) {
     res = null
   }
   if (res && res.status === 401) return null
-  if (res && res.status === 403) return { access_denied: true }
+  if (res && res.status === 403) {
+    const json = await res.json().catch(() => ({}))
+    if (json.code === 'no_access') return { access_denied: true }
+    // Some other refusal (a firewall, say) — not "no access", and never a reason to fall back.
+    throw new Error('The PIN could not be checked just now. Try again.')
+  }
   if (res && res.status === 429) {
     const json = await res.json().catch(() => ({}))
     throw new Error(json.error || 'Too many wrong PINs have been tried. Try again later.')
