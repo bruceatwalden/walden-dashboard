@@ -35,12 +35,61 @@ export function clearSession() {
   localStorage.removeItem(SESSION_KEY)
 }
 
+// Where the PIN is checked — the shared back end, the same door every Walden sign-in screen uses.
+const BACKEND = 'https://walden-backend.vercel.app'
+
+/**
+ * Sign in with a PIN. Returns the user object, { access_denied: true } for a right PIN whose account
+ * is not an admin or coordinator, or null for a PIN that is not recognised. Throws an Error with a
+ * message to show when sign-in is paused for too many wrong PINs.
+ *
+ * ⭐ THE PIN IS CHECKED BY THE SHARED BACK END, behind its limit on wrong PINs (2026-09-18). It used
+ * to be checked straight against the database with the key published in this page, with no limit
+ * at all. The back end checks the PIN and the admin/coordinator rule in one step.
+ *
+ * ⛔ THE DASHBOARD'S OWN WEB ADDRESS MUST BE ON THE BACK END'S LIST (walden-backend
+ * api/_lib/staff-cors.js) or the browser refuses the answer. On 2026-09-18 the Dashboard was not
+ * published and its address was unknown; add it when it is revived, BEFORE migration 256.
+ *
+ * ⛔ The old way is kept ONLY for when the back end cannot be reached at all. It stops working the
+ * day the database stops answering the published key (migration 256). A refusal never falls back.
+ */
 export async function login(pin) {
+  let res = null
+  try {
+    res = await fetch(`${BACKEND}/api/staff-session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'sign-in', pin, app_id: 'dashboard' }),
+    })
+  } catch {
+    res = null
+  }
+  if (res && res.status === 401) return null
+  if (res && res.status === 403) return { access_denied: true }
+  if (res && res.status === 429) {
+    const json = await res.json().catch(() => ({}))
+    throw new Error(json.error || 'Too many wrong PINs have been tried. Try again later.')
+  }
+  if (res && res.ok) {
+    const json = await res.json().catch(() => ({}))
+    if (json.user?.id && json.token) {
+      saveSession(json.user)
+      return json.user
+    }
+  }
+  return loginDirect(pin)
+}
+
+// The old way, for when the back end could not be reached. See login().
+async function loginDirect(pin) {
   const { data, error } = await supabase.rpc('authenticate_cm', {
     pin_input: pin,
   })
 
-  if (error) throw error
+  // Not "wrong PIN": the PIN was never checked. Once the database stops answering this page's key,
+  // this is what a back-end outage looks like here.
+  if (error) throw new Error('The PIN could not be checked just now. Try again.')
   if (!data) return null
 
   if (data.role !== 'admin' && data.role !== 'coordinator') {
