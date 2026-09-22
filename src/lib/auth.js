@@ -3,6 +3,10 @@ import { supabase } from './supabase'
 const SESSION_KEY = 'dashboard_session'
 const SESSION_EXPIRY_DAYS = 7
 const PERMISSIONS_KEY = 'dashboard_access_permissions'
+// The sign-in ticket the shared back end hands out. It is what proves to the back end WHICH PERSON
+// is asking, so a back-end screen can refuse a stranger (vendor compliance, from 2026-09-22).
+// Kept apart from the user record so nothing that prints or copies the user ever carries it.
+const TICKET_KEY = 'dashboard_actor_ticket'
 
 // --- Session management ---
 
@@ -15,11 +19,23 @@ export function getSession() {
     const elapsed = Date.now() - session.timestamp
     if (elapsed > SESSION_EXPIRY_DAYS * 24 * 60 * 60 * 1000) {
       localStorage.removeItem(SESSION_KEY)
+      localStorage.removeItem(TICKET_KEY)
       return null
     }
     return session.user
   } catch {
     localStorage.removeItem(SESSION_KEY)
+    localStorage.removeItem(TICKET_KEY)
+    return null
+  }
+}
+
+// The ticket for this sign-in, or null. Null after the old direct sign-in (used only when the back
+// end could not be reached) — the back end then refuses its guarded screens and says to sign in again.
+export function getActorTicket() {
+  try {
+    return getSession() ? localStorage.getItem(TICKET_KEY) : null
+  } catch {
     return null
   }
 }
@@ -32,7 +48,19 @@ export function saveSession(user) {
 }
 
 export function clearSession() {
+  let ticket = null
+  try { ticket = localStorage.getItem(TICKET_KEY) } catch { ticket = null }
   localStorage.removeItem(SESSION_KEY)
+  try { localStorage.removeItem(TICKET_KEY) } catch { /* nothing to forget */ }
+  // Tell the back end the ticket is finished, so it stops working at once rather than in a week.
+  // Best effort: signing out here must never wait on, or fail because of, the back end.
+  if (ticket) {
+    fetch(`${BACKEND}/api/staff-session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'sign-out', actor_token: ticket }),
+    }).catch(() => {})
+  }
 }
 
 // Where the PIN is checked — the shared back end, the same door every Walden sign-in screen uses.
@@ -80,6 +108,7 @@ export async function login(pin) {
     const json = await res.json().catch(() => ({}))
     if (json.user?.id && json.token) {
       saveSession(json.user)
+      localStorage.setItem(TICKET_KEY, json.token)
       return json.user
     }
   }
@@ -102,6 +131,8 @@ async function loginDirect(pin) {
   }
 
   saveSession(data)
+  // No ticket on this route: forget any from an earlier sign-in, so it cannot speak for this one.
+  localStorage.removeItem(TICKET_KEY)
   return data
 }
 

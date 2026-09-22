@@ -59,6 +59,25 @@ const fresh = () => { store.clear(); rpcCalls = []; sent = []; globalThis.__rpc 
 
 const auth = await import(pathToFileURL(out).href)
 
+// The vendor-list call, bundled against THE SAME auth module instance as above.
+const apiOut = path.join(path.dirname(out), 'api.mjs')
+await build({
+  entryPoints: [path.join(repoRoot, 'src/lib/api.js')],
+  bundle: true, format: 'esm', platform: 'node', outfile: apiOut, logLevel: 'silent',
+  plugins: [{
+    name: 'share-auth',
+    setup(b) {
+      b.onResolve({ filter: /^\.\/auth$/ }, () => ({ path: 'auth', namespace: 'shared' }))
+      b.onLoad({ filter: /.*/, namespace: 'shared' }, () => ({
+        contents: `export const getActorTicket = (...a) => globalThis.__auth.getActorTicket(...a)`,
+        loader: 'js',
+      }))
+    },
+  }],
+})
+globalThis.__auth = auth
+const api = await import(pathToFileURL(apiOut).href)
+
 test('a right PIN signs in with the back end\'s answer, and never asks the database', async () => {
   fresh()
   globalThis.fetch = answer(200, { token: TOKEN, user: USER })
@@ -109,4 +128,59 @@ test('⛔ a 403 that is not the back end answering "no access" (a firewall, say)
   globalThis.fetch = answer(403, { error: 'Forbidden' })
   await assert.rejects(auth.login('1234'), (e) => e.message !== 'ACCESS_DENIED' && e.code !== 'no_access')
   assert.equal(rpcCalls.length, 0)
+})
+
+// ⭐ 2026-09-22: the ticket is KEPT, because the back end's vendor list now refuses anyone without it.
+test('a back-end sign-in keeps its ticket; signing out forgets it and tells the back end', async () => {
+  fresh()
+  globalThis.fetch = answer(200, { token: TOKEN, user: USER })
+  await auth.login('1234')
+  assert.equal(auth.getActorTicket(), TOKEN)
+  assert.ok(!JSON.stringify(auth.getSession()).includes(TOKEN), 'the ticket is not inside the user record')
+  sent = []
+  auth.clearSession()
+  assert.equal(auth.getActorTicket(), null)
+  await new Promise((r) => setTimeout(r, 0))
+  assert.deepEqual(sent[0].body, { action: 'sign-out', actor_token: TOKEN })
+})
+
+test('the old direct sign-in carries no ticket, and drops any earlier one', async () => {
+  fresh()
+  store.set('dashboard_actor_ticket', TOKEN)
+  globalThis.fetch = async () => { throw new TypeError('Failed to fetch') }
+  await auth.login('1234')
+  assert.equal(auth.getActorTicket(), null)
+})
+
+test('no ticket is handed out once the sign-in has expired', async () => {
+  fresh()
+  globalThis.fetch = answer(200, { token: TOKEN, user: USER })
+  await auth.login('1234')
+  const s = JSON.parse(store.get('dashboard_session'))
+  s.timestamp = Date.now() - 8 * 24 * 60 * 60 * 1000
+  store.set('dashboard_session', JSON.stringify(s))
+  assert.equal(auth.getActorTicket(), null)
+  assert.equal(store.has('dashboard_actor_ticket'), false)
+})
+
+test('the vendor list carries the ticket in the x-walden-actor header, never in the address', async () => {
+  fresh()
+  globalThis.fetch = answer(200, { token: TOKEN, user: USER })
+  await auth.login('1234')
+  let seen = null
+  globalThis.fetch = async (url, opts) => { seen = { url: String(url), opts }; return { ok: true, status: 200, json: async () => ({}) } }
+  await api.getVendorCompliance(90)
+  assert.equal(seen.opts.headers['x-walden-actor'], TOKEN)
+  assert.ok(!seen.url.includes(TOKEN))
+  assert.match(seen.url, /vendor-compliance\?days=90$/)
+})
+
+test('with no ticket the vendor list is not asked, and the message says what is wrong', async () => {
+  fresh()
+  globalThis.fetch = async () => { throw new TypeError('Failed to fetch') }
+  await auth.login('1234')
+  let called = 0
+  globalThis.fetch = async () => { called++; return { ok: true, status: 200, json: async () => ({}) } }
+  await assert.rejects(api.getVendorCompliance(90), /could not reach the Walden back end/)
+  assert.equal(called, 0)
 })
