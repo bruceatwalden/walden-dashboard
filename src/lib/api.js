@@ -37,10 +37,16 @@ export async function getVendorCompliance(days) {
   return res.json()
 }
 
+// ⛔ From 2026-09-22 the back end accepts a WSIB override only from a signed-in person, and records
+// THAT person as having made it (whatever set_by says). Same ticket, same header as the list above.
 export async function postVendorOverride(body) {
+  const ticket = getActorTicket()
+  if (!ticket) {
+    throw new Error('This sign-in could not reach the Walden back end, and changing a WSIB status needs it. Sign out, check the connection, and sign in again.')
+  }
   const res = await fetch(`${BACKEND_URL}/wsib-override`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-walden-actor': ticket },
     body: JSON.stringify(body),
   })
   if (!res.ok) {

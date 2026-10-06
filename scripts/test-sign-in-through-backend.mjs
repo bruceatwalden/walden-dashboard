@@ -184,3 +184,21 @@ test('with no ticket the vendor list is not asked, and the message says what is 
   await assert.rejects(api.getVendorCompliance(90), /could not reach the Walden back end/)
   assert.equal(called, 0)
 })
+
+test('a WSIB override carries the ticket; with no ticket it is not sent at all', async () => {
+  fresh()
+  globalThis.fetch = answer(200, { token: TOKEN, user: USER })
+  await auth.login('1234')
+  let seen = null
+  globalThis.fetch = async (url, opts) => { seen = { url: String(url), opts }; return { ok: true, status: 200, json: async () => ({}) } }
+  await api.postVendorOverride({ vendor_name: 'X', status: 'not_required' })
+  assert.equal(seen.opts.headers['x-walden-actor'], TOKEN)
+  assert.match(seen.url, /\/wsib-override$/)
+  fresh()
+  globalThis.fetch = async () => { throw new TypeError('Failed to fetch') }
+  await auth.login('1234')
+  let called = 0
+  globalThis.fetch = async () => { called++; return { ok: true, status: 200, json: async () => ({}) } }
+  await assert.rejects(api.postVendorOverride({ vendor_name: 'X', status: 'not_required' }), /could not reach the Walden back end/)
+  assert.equal(called, 0)
+})
