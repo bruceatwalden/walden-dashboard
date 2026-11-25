@@ -43,6 +43,7 @@ globalThis.__from = (table) => ({ update: (vals) => ({ eq: async (col, id) => { 
 let sent = []
 const answer = (status, body) => { globalThis.fetch = async (url, opts) => { sent.push({ url: String(url), opts, body: JSON.parse(opts.body) }); return { ok: status >= 200 && status < 300, status, json: async () => body } } }
 const fresh = (ticket = 'a'.repeat(43)) => { direct = []; sent = []; globalThis.__ticket = ticket }
+const setNavigator = (value) => Object.defineProperty(globalThis, 'navigator', { value, configurable: true, writable: true })
 const PHOTO = '22222222-2222-4222-8222-222222222222'
 const q = await import(pathToFileURL(out).href)
 
@@ -58,11 +59,19 @@ test('with a ticket: the back end saves the tags, with the ticket header, and th
   assert.equal(direct.length, 0)
 })
 
-test('PHASE A: no ticket → the old save, without calling the back end', async () => {
+test('PHASE A: no ticket → the old save, and ONE no-ticket beacon so the back end can count it (never a write)', async () => {
+  const beacons = []
+  setNavigator({ sendBeacon: (url, data) => { beacons.push({ url, data: JSON.parse(data) }); return true } })
   fresh(null); answer(200, { ok: true })
   await q.updatePhotoAnalysis(PHOTO, { phases: ['Framing'] })
-  assert.equal(sent.length, 0)
+  assert.equal(sent.length, 0, 'no ticketed call')
+  assert.deepEqual(beacons, [{ url: 'https://walden-backend.vercel.app/api/dashboard-photo-phases', data: { page_user_id: 'u-1' } }], 'no tags, no ticket in the count')
   assert.deepEqual(direct, [{ table: 'site_photos', vals: { construction_phases: ['Framing'] }, col: 'id', id: PHOTO }])
+  // A beacon that throws, or no beacon at all, never stops the save.
+  setNavigator({ sendBeacon: () => { throw new Error('blocked') } })
+  fresh(null); await q.updatePhotoAnalysis(PHOTO, { phases: ['Framing'] }); assert.equal(direct.length, 1)
+  setNavigator(undefined)
+  fresh(null); await q.updatePhotoAnalysis(PHOTO, { phases: ['Framing'] }); assert.equal(direct.length, 1)
 })
 
 test('PHASE A: the back end\'s two "nothing touched" answers → the old save', async () => {

@@ -797,6 +797,15 @@ export async function updatePhotoAnalysis(photoId, { phases }) {
   // address is not on its staff list (then the browser blocks the call before it is sent, and the back end never
   // hears of it). Phase A: the old save, as before.
   if (!ticket) {
+    // ⭐ COUNTED ANYWAY: the back end must hear of every no-ticket save, or the Phase B count would read a false zero
+    // for the Dashboard. A beacon is a plain-text send any page may make (the browser does not hold it back for the
+    // staff list); it carries no ticket, so the door writes nothing and logs one "[site-photos-dash] no-ticket" line.
+    // Best-effort on purpose: a count that cannot be sent must never stop the tag save.
+    try {
+      if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+        navigator.sendBeacon(PHOTO_PHASES_URL, JSON.stringify({ page_user_id: getSession()?.id || undefined }))
+      }
+    } catch { /* the count is best-effort; the save below still runs */ }
     if (PHOTO_PHASES_PIN_BOX_ON) throw new Error('This sign-in could not reach the Walden back end, and saving tags needs it. Sign out and sign in again. Nothing was saved.')
     return directPhotoPhases(photoId, phases)
   }
