@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { getActorTicket, getSession } from './auth'
 
 // --- Projects ---
 
@@ -767,8 +768,19 @@ export async function getUncategorizedPhotos() {
   return data || []
 }
 
-// Update a photo's analysis results
-export async function updatePhotoAnalysis(photoId, { phases }) {
+// ⛔ A PHOTO'S TAGS ARE SAVED BY THE BACK END (Security step 2, 25 Nov 2026), behind this Dashboard's signed sign-in
+// ticket, so the public key can later lose the power to change photo records (it can also flip which photos a
+// homeowner sees). walden-backend api/dashboard-photo-phases.js changes construction_phases and nothing else.
+const PHOTO_PHASES_URL = 'https://walden-backend.vercel.app/api/dashboard-photo-phases'
+export const PHOTO_MAYBE_SAVED = 'No clear answer from the Walden back end: the tags may or may not have saved.'
+
+// ⭐ PHASE A, the same shape as Site Log's doors: no PIN box. With no ticket, or on the back end's two "nothing was
+// touched" answers (403 sign_in_needed, 503 sign_in_unchecked), the tags are saved the old way below. PHASE B: set
+// this true and delete directPhotoPhases, then the migration. Never run it while this is false.
+export const PHOTO_PHASES_PIN_BOX_ON = false
+
+// ⛔ PHASE A ONLY — the browser's own save, word for word as before Security step 2.
+async function directPhotoPhases(photoId, phases) {
   const { error } = await supabase
     .from('site_photos')
     .update({
@@ -776,6 +788,41 @@ export async function updatePhotoAnalysis(photoId, { phases }) {
     })
     .eq('id', photoId)
   if (error) throw error
+}
+
+// Update a photo's analysis results. THROWS on any refusal or unclear answer, so the tagger never counts it as done.
+export async function updatePhotoAnalysis(photoId, { phases }) {
+  const ticket = getActorTicket()
+  // No ticket: this sign-in went the old direct way, because the back end could not be reached or this page's
+  // address is not on its staff list (then the browser blocks the call before it is sent, and the back end never
+  // hears of it). Phase A: the old save, as before.
+  if (!ticket) {
+    if (PHOTO_PHASES_PIN_BOX_ON) throw new Error('This sign-in could not reach the Walden back end, and saving tags needs it. Sign out and sign in again. Nothing was saved.')
+    return directPhotoPhases(photoId, phases)
+  }
+  let res
+  try {
+    res = await fetch(PHOTO_PHASES_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-walden-actor': ticket },
+      body: JSON.stringify({ id: photoId, construction_phases: phases, page_user_id: getSession()?.id || undefined }),
+    })
+  } catch (cause) {
+    // A lost reply may have landed after the save: never the old save on top, never "not saved".
+    const err = new Error(PHOTO_MAYBE_SAVED)
+    err.cause = cause
+    err.maybeSaved = true
+    throw err
+  }
+  const json = await res.json().catch(() => ({}))
+  if (res.ok && json.ok === true) return
+  const nothingTouched = (res.status === 403 && json.code === 'sign_in_needed') || (res.status === 503 && json.code === 'sign_in_unchecked')
+  if (nothingTouched && !PHOTO_PHASES_PIN_BOX_ON) return directPhotoPhases(photoId, phases)
+  const err = new Error(json.error || (res.status >= 500 ? PHOTO_MAYBE_SAVED : `The tags were not saved (${res.status}).`))
+  err.status = res.status
+  err.code = json.code
+  err.maybeSaved = json.code === 'maybe_saved' || (!json.error && res.status >= 500)
+  throw err
 }
 
 // Auto-categorizer: recent uncategorized photos (Feb 2026 onwards)
